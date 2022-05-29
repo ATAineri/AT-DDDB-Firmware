@@ -496,54 +496,193 @@ void EXTI4_15_IRQHandler(void)
 		HAL_I2C_Master_Transmit(&hi2c2, 0x38, frame, size, I2C_TIMEOUT);
 
 		break;
-		/*
+	case AK4499EX:	// ADDRS: 0x20, 0x21
+		// Control 1 Reg: Reset
+		frame[0] = 0x0; frame[1] = 0xE;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// Control 2 Reg: filters
+		frame[0] = 0x1; frame[1] = (ak4493eq_fir << 3) | 0x3;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// Control 3 Reg: DSD/PCM
+		frame[0] = 0x2; frame[1] = (!pcm_dsd) << 7;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// Control 4 Reg: Sample Speed
+		frame[0] = 0x5; frame[1] = dfs << 1;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// DSD1 Reg: DSD Sample SPeed
+		frame[0] = 0x6; frame[1] = 0x8 | dfs;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// Control 2 Reg: filters
+		frame[0] = 0x1; frame[1] = (ak4493eq_fir << 3) | 0x2;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// Control 1 Reg: Reset
+		frame[0] = 0x0; frame[1] = 0xF;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		break;
 	case CS43198:		// addrs: 0x30, 0x31
-		// SWITCHING MCLK FREQUENSY 5.12.7
-		// STEP 1: Power down
+		uint8_t *cs_frame[5];
+		const uint8_t cs_size = 5;
 
-		// Enable PDN_DONE interrupt
-		uint8_t cs_size = 5, cs_frame[5];
-		cs_frame[0] = 0xF; cs_frame[1] = 0x0; cs_frame[2] = 0x10; cs_frame[3] = 0x0;
-		cs_frame[4] = 0xFE;
+		// 1. Power down amplifier
+		frame[0] = 0x2; frame[1] = 0x00; frame[2] = 0x00;
+		frame[3] = 0x0;
+		frame[4] = 0xB6;
 		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
 
-		cs_frame[0] = 0xF; cs_frame[1] = 0x0; cs_frame[2] = 0x10; cs_frame[3] = 0x0;
-		cs_frame[4] = 0xFE;
+		HAL_Delay(300);
+
+		// 2. Power down ASP
+		frame[0] = 0x2; frame[1] = 0x00; frame[2] = 0x00;
+		frame[3] = 0x0;
+		frame[4] = 0xF6;
 		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
 
-		// TODO: check PDN_DONE_INT = 1 in 0xF0000 for each DAC
-
-		cs_frame[0] = 0x2; cs_frame[1] = 0x0; cs_frame[2] = 0x0; cs_frame[3] = 0x0;
-		cs_frame[4] = pcm_dsd ? 0x40 : 0xE0;
+		// 3. Set MCLK Source to RCO
+		frame[0] = 0x1; frame[1] = 0x00; frame[2] = 0x06;
+		frame[3] = 0x0;
+		frame[4] = 0x6;
 		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
 
-		// STEP 2: Switching MCLK Source to RCO
-		cs_frame[0] = 0x1; cs_frame[1] = 0x0; cs_frame[2] = 0x06; cs_frame[3] = 0x0;
-		cs_frame[4] = 0x6;
+		HAL_Delay(2);
+
+		// 6. Change MCLK_INT frequency
+		frame[0] = 0x1; frame[1] = 0x00; frame[2] = 0x06;
+		frame[3] = 0x0;
+		frame[4] = ((HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == C_44_1 ? 0x1 : 0x0) << 2) | 0x2;
 		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
 
-		// TODO: STEP 3: Sleep 150 us
-		cs_frame[0] = 0x1; cs_frame[1] = 0x0; cs_frame[2] = 0x06; cs_frame[3] = 0x0;
-		cs_frame[4] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) ? 0x16 : 0x6;
+		// 8. Switch MCLK source to direct MCLK mode
+		frame[0] = 0x1; frame[1] = 0x00; frame[2] = 0x06;
+		frame[3] = 0x0;
+		frame[4] = (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == C_44_1 ? 0x1 : 0x0) << 2;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x1; frame[1] = 0x00; frame[2] = 0x0B;
+		frame[3] = 0x0;
+		switch (boleroSampleSpeed)
+		{
+		case SS_48:
+			frame[4] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == C_44_1 ? 0x1 : 0x2;
+			break;
+		case SS_96:
+			frame[4] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == C_44_1 ? 0x3 : 0x4;
+			break;
+		case SS_192:
+			frame[4] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == C_44_1 ? 0x5 : 0x6;
+			break;
+		case SS_384:
+			frame[4] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == C_44_1 ? 0x7 : 0x8;
+			break;
+		}
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// Configure DSD path Signal Control 2
+		frame[0] = 0x7; frame[1] = 0x00; frame[2] = 0x04;
+		frame[3] = 0x0;
+		switch (boleroSampleSpeed)
+		{
+		case DSD_64:
+			frame[4] = 0x82;
+			break;
+		case DSD_128:
+			frame[4] = 0x86;
+			break;
+		case DSD_256:
+			frame[4] = 0x0A;
+			break;
+		case DSD_512:
+			break;
+		}
+		frame[4] |= !pcm_dsd << 0x4;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		HAL_Delay(2);
+
+		// 38. Power up DAC
+		frame[0] = 0x1; frame[1] = 0x00; frame[2] = 0x10;
+		frame[3] = 0x0;
+		frame[4] = 0x99;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x8; frame[1] = 0x00; frame[2] = 0x32;
+		frame[3] = 0x0;
+		frame[4] = 0x20;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x2; frame[1] = 0x00; frame[2] = 0x00;
+		frame[3] = 0x0;
+		frame[4] = 0xF6 & ~(pcm_dsd << 6) & ~(!pcm_dsd << 5);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x2; frame[1] = 0x00; frame[2] = 0x00;
+		frame[3] = 0x0;
+		frame[4] = 0xE6 & ~(pcm_dsd << 6) & ~(!pcm_dsd << 5);;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x8; frame[1] = 0x00; frame[2] = 0x32;
+		frame[3] = 0x0;
+		frame[4] = 0x0;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x1; frame[1] = 0x00; frame[2] = 0x10;
+		frame[3] = 0x0;
+		frame[4] = 0x99;
 		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
 		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
 
 		break;
-		 */
 	}
 
   /* USER CODE END EXTI4_15_IRQn 0 */

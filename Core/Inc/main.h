@@ -45,7 +45,8 @@ enum DACs
 	AK4493EQ,
 	DSD1794A,
 	BD34301EKV,
-	CS43198
+	CS43198,
+	AK4499EX
 };
 
 enum SamplingSpeed
@@ -72,6 +73,15 @@ enum AK4493EQ_FIRS
 	ShortDelaySlowRollOff,
 	SuperSlowRollOff,
 	LowDispersionShortDelay = 0x6
+};
+
+enum CS43198_FIRS
+{
+	SharpRollOffLL,
+	SharpRollOffPC,
+	SlowRollOffLL,
+	SlowRollOffPC,
+	NOS
 };
 
 enum CLOCKS

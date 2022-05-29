@@ -57,12 +57,15 @@ uint32_t progtime;
 uint8_t ak4493eq_fir;
 uint8_t dsd1794a_fir;
 uint8_t bd34301ekv_fir;
+uint8_t cs43198_fir;
+uint8_t ak4191eq_fir;
 
 uint8_t tx_buf[256 * 64 / 2];
 
 const char AK4493EQ_FIRS_NAMES[6][16]   = {"Sharp", "Slow", "SD Sharp", "SD Slow", "Super Slow", "Low Dispersion"};
 const char DSD1794A_FIRS_NAMES[2][16]   = {"Sharp", "Slow"};
 const char BD34301EKV_FIRS_NAMES[2][16] = {"Sharp", "Slow"};
+const char CS43198_FIRS_NAMES[5][16]	= {"Sharp LowLatency", "Sharp Phase Comp", "Slow LowLatency", "Slow Phase Comp", "NOS"};
 
 /* USER CODE END PV */
 
@@ -441,6 +444,523 @@ int main(void)
 		HAL_I2C_Master_Transmit(&hi2c2, 0x38, frame, size, I2C_TIMEOUT);
 
 		break;
+	case AK4499EX:
+		select_font(&FreeSansOblique9pt7b);
+		draw_text(tx_buf, "AK4499EX", 9, 5, 15);
+		send_buffer_to_OLED(tx_buf, 0, 0);
+		HAL_Delay(2000);
+
+		// Control 1 Reg: Reset
+		frame[0] = 0x0; frame[1] = 0xE;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// Control 2 Reg: filters
+		frame[0] = 0x1; frame[1] = 0x3;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// Control 3 Reg: DSD/PCM
+		frame[0] = 0x2; frame[1] = (!pcm_dsd) << 7;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// Control 4 Reg: Sample Speed
+		frame[0] = 0x5; frame[1] = dfs << 1;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// DSD1 Reg: DSD Sample SPeed
+		frame[0] = 0x6; frame[1] = 0x8 | dfs;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// Control 5 Reg: SYNCE disabling
+		frame[0] = 0x7; frame[1] = 0x0;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// Control 6 Reg: Clock configuring
+		frame[0] = 0x8; frame[1] = 0x4;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// DSD2 Reg: DSD input path configuring
+		frame[0] = 0x9; frame[1] = 0x1;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// DSMI/O Reg: OSR setting
+		frame[0] = 0xC; frame[1] = 0x81;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// Control 2 Reg: filters
+		frame[0] = 0x1; frame[1] = 0x2;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		// Control 1 Reg: Reset
+		frame[0] = 0x0; frame[1] = 0xF;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+		break;
+	case CS43198:
+		select_font(&FreeSansOblique9pt7b);
+		draw_text(tx_buf, "CS43198", 9, 5, 15);
+		send_buffer_to_OLED(tx_buf, 0, 0);
+		HAL_Delay(2000);
+
+		uint8_t *cs_frame[5];
+		const uint8_t cs_size = 5;
+
+		// 1. Apply all relevant power supplies, then assert RESET
+		// 2. Wait for 1.5 ms
+		// 3. Configure XTAL driver
+
+		// 4. Configure XTAL bias current strength (assuming River Crystal at 22.5792 MHz)
+		frame[0] = 0x2; frame[1] = 0x00; frame[2] = 0x52;
+		frame[3] = 0x0;
+		frame[4] = 0x4;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// 7. Start XTAL
+		frame[0] = 0x2; frame[1] = 0x00; frame[2] = 0x00;
+		frame[3] = 0x0;
+		frame[4] = 0xF6;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// 9. Set ASP sample rate
+		frame[0] = 0x1; frame[1] = 0x00; frame[2] = 0x0B;
+		frame[3] = 0x0;
+		switch (boleroSampleSpeed)
+		{
+		case SS_48:
+			frame[4] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == C_44_1 ? 0x1 : 0x2;
+			break;
+		case SS_96:
+			frame[4] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == C_44_1 ? 0x3 : 0x4;
+			break;
+		case SS_192:
+			frame[4] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == C_44_1 ? 0x5 : 0x6;
+			break;
+		case SS_384:
+			frame[4] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == C_44_1 ? 0x7 : 0x8;
+			break;
+		}
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// 10. Set ASP sample bit size. XSP is don't care
+		frame[0] = 0x1; frame[1] = 0x00; frame[2] = 0x0C;
+		frame[3] = 0x0;
+		frame[4] = 0x00;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// 18. Set ASP channel size and	enable. Set both Channel 1 and Channel 2 to the same active phase to get the same data for mono mode
+		frame[0] = 0x5; frame[1] = 0x00; frame[2] = 0x0A;
+		frame[3] = 0x0;
+		frame[4] = 0x07;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x5; frame[1] = 0x00; frame[2] = 0x0B;
+		frame[3] = 0x0;
+		frame[4] = 0x0F;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// 20. Set volume for channels
+		frame[0] = 0x9; frame[1] = 0x00; frame[2] = 0x01;
+		frame[3] = 0x0;
+		frame[4] = 0x00;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x9; frame[1] = 0x00; frame[2] = 0x02;
+		frame[3] = 0x0;
+		frame[4] = 0x00;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// 23. Configure PCM path signal control
+		frame[0] = 0x9; frame[1] = 0x00; frame[2] = 0x03;
+		frame[3] = 0x0;
+		frame[4] = 0x0E;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x9; frame[1] = 0x00; frame[2] = 0x04;
+		frame[3] = 0x0;
+		frame[4] = 0x00;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// 24. DSD IF
+		// Volume 0 bB
+		frame[0] = 0x7; frame[1] = 0x00; frame[2] = 0x00;
+		frame[3] = 0x0;
+		frame[4] = 0x00;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x7; frame[1] = 0x00; frame[2] = 0x01;
+		frame[3] = 0x0;
+		frame[4] = 0x00;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// Configure DSD path Signal Control 1
+		frame[0] = 0x7; frame[1] = 0x00; frame[2] = 0x02;
+		frame[3] = 0x0;
+		frame[4] = 0xCC;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// Configure DSD path Signal Control 2
+		frame[0] = 0x7; frame[1] = 0x00; frame[2] = 0x04;
+		frame[3] = 0x0;
+		switch (boleroSampleSpeed)
+		{
+		case DSD_64:
+			frame[4] = 0x82;
+			break;
+		case DSD_128:
+			frame[4] = 0x86;
+			break;
+		case DSD_256:
+			frame[4] = 0x0A;
+			break;
+		case DSD_512:
+			break;
+		}
+		frame[4] |= !pcm_dsd << 0x4;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// Configure DSD path Signal Control 3
+		frame[0] = 0x7; frame[1] = 0x00; frame[2] = 0x06;
+		frame[3] = 0x0;
+		frame[4] = 0xC1;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// Direct DSD Path Signal Control
+		frame[0] = 0x7; frame[1] = 0x00; frame[2] = 0x07;
+		frame[3] = 0x0;
+		frame[4] = 0x4;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// 25. Configure Class H amplifier
+		frame[0] = 0xB; frame[1] = 0x00; frame[2] = 0x00;
+		frame[3] = 0x0;
+		frame[4] = 0x09;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// 26. Set DAC output to full scale
+		frame[0] = 0x8; frame[1] = 0x00; frame[2] = 0x00;
+		frame[3] = 0x0;
+		frame[4] = 0x20;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// 34. Switch MCLK source to XTAL
+		frame[0] = 0x1; frame[1] = 0x00; frame[2] = 0x06;
+		frame[3] = 0x0;
+		frame[4] = (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == C_44_1 ? 0x1 : 0x0) << 2;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// 35. Wait at least 150 μs.
+		HAL_Delay(1);
+
+		// 37. Enable mono mode
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x09;
+		frame[3] = 0x0;
+		frame[4] = 0x2F;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x0A;
+		frame[3] = 0x0;
+		frame[4] = 0xB4;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x0B;
+		frame[3] = 0x0;
+		frame[4] = 0x25;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x0C;
+		frame[3] = 0x0;
+		frame[4] = 0x80;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x0F;
+		frame[3] = 0x0;
+		frame[4] = 0x09;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x10;
+		frame[3] = 0x0;
+		frame[4] = 0xFB;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x19;
+		frame[3] = 0x0;
+		frame[4] = 0x2F;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x1A;
+		frame[3] = 0x0;
+		frame[4] = 0xB4;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x1B;
+		frame[3] = 0x0;
+		frame[4] = 0x25;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x1C;
+		frame[3] = 0x0;
+		frame[4] = 0x80;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x1F;
+		frame[3] = 0x0;
+		frame[4] = 0x93;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x20;
+		frame[3] = 0x0;
+		frame[4] = 0xFD;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x29;
+		frame[3] = 0x0;
+		frame[4] = 0x2F;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x2A;
+		frame[3] = 0x0;
+		frame[4] = 0xB4;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x2B;
+		frame[3] = 0x0;
+		frame[4] = 0x25;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x2C;
+		frame[3] = 0x0;
+		frame[4] = 0x80;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x2F;
+		frame[3] = 0x0;
+		frame[4] = 0x7C;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x30;
+		frame[3] = 0x0;
+		frame[4] = 0xFD;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x39;
+		frame[3] = 0x0;
+		frame[4] = 0x2F;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x3A;
+		frame[3] = 0x0;
+		frame[4] = 0xB4;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x3B;
+		frame[3] = 0x0;
+		frame[4] = 0x25;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x3C;
+		frame[3] = 0x0;
+		frame[4] = 0x80;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x3F;
+		frame[3] = 0x0;
+		frame[4] = 0x41;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x18; frame[1] = 0x00; frame[2] = 0x40;
+		frame[3] = 0x0;
+		frame[4] = 0xFE;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		// 38. Power up DAC
+		frame[0] = 0x1; frame[1] = 0x00; frame[2] = 0x10;
+		frame[3] = 0x0;
+		frame[4] = 0x99;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x8; frame[1] = 0x00; frame[2] = 0x32;
+		frame[3] = 0x0;
+		frame[4] = 0x20;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x2; frame[1] = 0x00; frame[2] = 0x00;
+		frame[3] = 0x0;
+		frame[4] = 0xF6 & ~(pcm_dsd << 6) & ~(!pcm_dsd << 5);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x2; frame[1] = 0x00; frame[2] = 0x00;
+		frame[3] = 0x0;
+		frame[4] = 0xE6 & ~(pcm_dsd << 6) & ~(!pcm_dsd << 5);;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x8; frame[1] = 0x00; frame[2] = 0x32;
+		frame[3] = 0x0;
+		frame[4] = 0x0;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		frame[0] = 0x1; frame[1] = 0x00; frame[2] = 0x10;
+		frame[3] = 0x0;
+		frame[4] = 0x99;
+		HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+		HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+		break;
 	}
 
   /* USER CODE END 2 */
@@ -453,6 +973,7 @@ int main(void)
 	switch (dacv)
 	{
 	case AK4493EQ:
+	case AK4499EX:
 		draw_text(tx_buf, AK4493EQ_FIRS_NAMES[fir], 9, 53, 15);
 		break;
 	case DSD1794A:
@@ -550,6 +1071,49 @@ int main(void)
 
 						draw_text(tx_buf, BD34301EKV_FIRS_NAMES[fir], 9, 53, 15);
 						break;
+					case AK4499EX:
+						fir = fir == 5 ? 0 : fir + 1;
+						ak4493eq_fir = fir == 5 ? 6 : fir;
+
+						// Control 2 Reg: filters
+						frame[0] = 0x1; frame[1] = (ak4493eq_fir << 3) | 0x2;
+						HAL_I2C_Master_Transmit(&hi2c1, 0x20, frame, size, I2C_TIMEOUT);
+						HAL_I2C_Master_Transmit(&hi2c2, 0x20, frame, size, I2C_TIMEOUT);
+
+						draw_text(tx_buf, AK4493EQ_FIRS_NAMES[fir], 9, 53, 15);
+						break;
+					case CS43198:
+						fir = fir == 4 ? 0 : fir + 1;
+
+						uint8_t *cs_frame[5];
+						const uint8_t cs_size = 5;
+
+						frame[0] = 0x2; frame[1] = 0x00; frame[2] = 0x52;
+						frame[3] = 0x0;
+						switch (fir)
+						{
+						case SharpRollOffLL:
+							frame[4] = 0x02;
+							break;
+						case SharpRollOffPC:
+							frame[4] = 0x42;
+							break;
+						case SlowRollOffLL:
+							frame[4] = 0x82;
+							break;
+						case SlowRollOffPC:
+							frame[4] = 0xC2;
+							break;
+						case NOS:
+							frame[4] = 0xE2;
+							break;
+						}
+						HAL_I2C_Master_Transmit(&hi2c1, 0x30, cs_frame, cs_size);
+						HAL_I2C_Master_Transmit(&hi2c1, 0x31, cs_frame, cs_size);
+						HAL_I2C_Master_Transmit(&hi2c2, 0x30, cs_frame, cs_size);
+						HAL_I2C_Master_Transmit(&hi2c2, 0x31, cs_frame, cs_size);
+
+						draw_text(tx_buf, CS43198_FIRS_NAMES[fir], 9, 53, 15);
 				}
 				send_buffer_to_OLED(tx_buf, 0, 0);
 				HAL_Delay(2000);
